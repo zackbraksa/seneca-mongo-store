@@ -1,33 +1,31 @@
 /* Copyright (c) 2010-2020 Richard Rodger and other contributors, MIT License */
-'use strict'
+"use strict";
 
-const Mongo = require('mongodb')
-const MongoClient = Mongo.MongoClient
+const { MongoClient } = require("mongodb");
 
-const { intern } = require('./lib/intern')
+const { intern } = require("./lib/intern");
 
-const name = 'mongo-store'
-
+const name = "mongo-store";
 /*
 native$ = object => use object as query, no meta settings
 native$ = array => use first elem as query, second elem as meta settings
 */
 
 const mongo_store = function mongo_store(options) {
-  const seneca = this
-  let desc
+  const seneca = this;
+  let desc;
 
-  let dbinst = null
-  let dbclient = null
-  let collmap = {}
+  let dbinst = null;
+  let dbclient = null;
+  let collmap = {};
 
   function error(args, err, cb) {
     if (err) {
-      seneca.log.error('entity', err, args, { store: name })
+      seneca.log.error("entity", err, args, { store: name });
 
-      cb(err)
-      return true
-    } else return false
+      cb(err);
+      return true;
+    } else return false;
   }
 
   function configure(conf, cb) {
@@ -35,52 +33,70 @@ const mongo_store = function mongo_store(options) {
     // TODO: expose connection action
     //if (!_.isUndefined(conf.connect) && !conf.connect) {
     if (false === conf.connect) {
-      return cb()
+      return cb();
     }
 
     // Turn the hash into a mongo uri
     if (!conf.uri) {
-      conf.uri = 'mongodb://'
-      conf.uri += conf.username ? conf.username : ''
-      conf.uri += conf.password ? ':' + conf.password + '@' : ''
-      conf.uri += conf.host || conf.server
-      conf.uri += conf.port ? ':' + conf.port : ':27017'
+      conf.uri = "mongodb://";
+      conf.uri += conf.username ? conf.username : "";
+      conf.uri += conf.password ? ":" + conf.password + "@" : "";
+      conf.uri += conf.host || conf.server;
+      conf.uri += conf.port ? ":" + conf.port : ":27017";
     }
 
-    conf.db = conf.db || conf.name
+    conf.db = conf.db || conf.name;
 
-    // Connect using the URI
-    return MongoClient.connect(
-      conf.uri,
+    MongoClient.connect(conf.uri)
+      .then((client) => {
+        dbclient = client;
+        dbinst = client.db(conf.db);
+        seneca.log.debug("init", "db open", conf.db);
+        console.log("dbinst", "initiated");
+        cb(null);
+        return dbinst;
+      })
+      .catch((err) => {
+        console.log("err", err);
+        return seneca.die("connect", err, conf);
+      });
 
-      { useUnifiedTopology: true },
+    // // Connect using the URI
+    // return MongoClient.connect(
+    //   conf.uri,
 
-      function (err, client) {
-        if (err) {
-          return seneca.die('connect', err, conf)
-        }
-        dbclient = client
-        // Set the instance to use throughout the plugin
-        dbinst = client.db(conf.db)
-        seneca.log.debug('init', 'db open', conf.db)
-        cb(null)
-      }
-    )
+    //   { useUnifiedTopology: true },
+
+    //   function (err, client) {
+    //     if (err) {
+    //       return seneca.die('connect', err, conf)
+    //     }
+    //     dbclient = client
+    //     // Set the instance to use throughout the plugin
+    //     dbinst = client.db(conf.db)
+    //     seneca.log.debug('init', 'db open', conf.db)
+    //     cb(null)
+    //   }
+    // )
   }
 
   function getcoll(args, ent, cb) {
-    const canon = ent.canon$({ object: true })
-    const collname = (canon.base ? canon.base + '_' : '') + canon.name
+    const canon = ent.canon$({ object: true });
+    const collname = (canon.base ? canon.base + "_" : "") + canon.name;
 
     if (!collmap[collname]) {
-      dbinst.collection(collname, function (err, coll) {
-        if (!error(args, err, cb)) {
-          collmap[collname] = coll
-          cb(null, coll)
-        }
-      })
+      try {
+        const coll = dbinst.collection(collname);
+        collmap[collname] = coll;
+        console.log("collmap-if");
+        cb(null, coll);
+      } catch (err) {
+        console.log("err", err);
+        error(args, err, cb);
+      }
     } else {
-      cb(null, collmap[collname])
+      console.log("collmap-else");
+      cb(null, collmap[collname]);
     }
   }
 
@@ -89,61 +105,66 @@ const mongo_store = function mongo_store(options) {
 
     close: function (args, cb) {
       if (dbclient) {
-        dbclient.close(cb)
-      } else return cb()
+        dbclient.close(cb);
+      } else return cb();
     },
 
     save: function (msg, done) {
       return getcoll(msg, msg.ent, function (err, coll) {
         if (error(msg, err, done)) {
-          return
+          return;
         }
 
-        const is_update = null != msg.ent.id
+        console.log("save-getcoll");
+
+        const is_update = null != msg.ent.id;
 
         if (is_update) {
-          return update(msg, coll, done)
+          console.log("save-update");
+          return update(msg, coll, done);
         }
 
-        return create(msg, coll, done)
-      })
+        console.log("save-create");
+        return create(msg, coll, done);
+      });
 
       function create(msg, coll, done) {
-        const upsert_fields = isUpsert(msg)
+        const upsert_fields = isUpsert(msg);
 
         if (null == upsert_fields) {
-          return createNew(msg, coll, done)
+          console.log("save-create-upsert_fields-null");
+          return createNew(msg, coll, done);
         }
 
-        return doUpsert(upsert_fields, msg, coll, done)
+        return doUpsert(upsert_fields, msg, coll, done);
 
         function isUpsert(msg) {
           if (!Array.isArray(msg.q.upsert$)) {
-            return null
+            return null;
           }
 
-          const upsert_fields = msg.q.upsert$.filter((p) => !p.includes('$'))
-          const public_entdata = msg.ent.data$(false)
+          const upsert_fields = msg.q.upsert$.filter((p) => !p.includes("$"));
+          const public_entdata = msg.ent.data$(false);
 
           const is_upsert =
             upsert_fields.length > 0 &&
-            upsert_fields.every((p) => p in public_entdata)
+            upsert_fields.every((p) => p in public_entdata);
 
-          return is_upsert ? upsert_fields : null
+          return is_upsert ? upsert_fields : null;
         }
 
         function doUpsert(upsert_fields, msg, coll, done) {
           const filter_by = upsert_fields.reduce((acc, field) => {
-            acc[field] = msg.ent[field]
-            return acc
-          }, {})
+            acc[field] = msg.ent[field];
+            return acc;
+          }, {});
 
-          const public_entdata = msg.ent.data$(false)
-          const replacement = { $set: public_entdata }
-          const new_id = intern.ensure_id(msg.ent, options)
+          const public_entdata = msg.ent.data$(false);
+          const replacement = { $set: public_entdata };
+          const new_id = intern.ensure_id(msg.ent, options);
 
           if (null != new_id) {
-            replacement.$setOnInsert = { _id: new_id }
+            replacement.$setOnInsert = { _id: new_id };
           }
 
           return intern.attempt_upsert(
@@ -152,57 +173,71 @@ const mongo_store = function mongo_store(options) {
             replacement,
             (err, update) => {
               if (error(msg, err, done)) {
-                return
+                return;
               }
 
-              const doc = update.value
-              const { ent } = msg
+              const doc = update.value;
+              const { ent } = msg;
 
-              return finalizeSave('save/upsert', doc, ent, seneca, done)
+              return finalizeSave("save/upsert", doc, ent, seneca, done);
             }
-          )
+          );
         }
 
         function createNew(msg, coll, done) {
+          console.log("save-createNew");
           const new_doc = (function () {
-            const public_entdata = msg.ent.data$(false)
-            const id = intern.ensure_id(msg.ent, options)
+            const public_entdata = msg.ent.data$(false);
+            const id = intern.ensure_id(msg.ent, options);
 
-            const new_doc = Object.assign({}, public_entdata)
+            const new_doc = Object.assign({}, public_entdata);
 
             if (null != id) {
-              new_doc._id = id
+              new_doc._id = id;
             }
 
-            return new_doc
-          })()
+            return new_doc;
+          })();
 
-          return coll.insertOne(new_doc, function (err, inserts) {
-            if (error(msg, err, done)) {
-              return
-            }
+          return coll
+            .insertOne(new_doc)
+            .then((inserts) => {
+              console.log("inserts", inserts);
+              const { ent } = msg;
+              return finalizeSave("save/insert", inserts, ent, seneca, done);
+            })
+            .catch((err) => {
+              if (error(msg, err, done)) {
+                return;
+              }
+            });
 
-            const doc = inserts.ops[0]
-            const { ent } = msg
+          // return coll.insertOne(new_doc, function (err, inserts) {
+          //   if (error(msg, err, done)) {
+          //     return;
+          //   }
 
-            return finalizeSave('save/insert', doc, ent, seneca, done)
-          })
+          //   const doc = inserts.ops[0];
+          //   const { ent } = msg;
+
+          //   return finalizeSave("save/insert", doc, ent, seneca, done);
+          // });
         }
       }
 
       function update(msg, coll, done) {
-        const ent = msg.ent
-        const entp = ent.data$(false)
+        const ent = msg.ent;
+        const entp = ent.data$(false);
 
-        const q = { _id: intern.makeid(ent.id) }
-        delete entp.id
+        const q = { _id: intern.makeid(ent.id) };
+        delete entp.id;
 
-        let set = entp
-        let func = 'findOneAndReplace'
+        let set = entp;
+        let func = "findOneAndReplace";
 
         if (intern.should_merge(ent, options)) {
-          set = { $set: entp }
-          func = 'findOneAndUpdate'
+          set = { $set: entp };
+          func = "findOneAndUpdate";
         }
 
         coll[func](
@@ -211,174 +246,175 @@ const mongo_store = function mongo_store(options) {
           { upsert: true, returnOriginal: false },
           function (err, update) {
             if (error(msg, err, done)) {
-              return
+              return;
             }
 
-            const doc = update.value
-            const { ent } = msg
+            const doc = update.value;
+            const { ent } = msg;
 
-            return finalizeSave('save/update', doc, ent, seneca, done)
+            return finalizeSave("save/update", doc, ent, seneca, done);
           }
-        )
+        );
       }
 
       function finalizeSave(operation_name, doc, ent, seneca, done) {
-        const fent = intern.makeent(doc, ent, seneca)
+        const fent = intern.makeent(doc, ent, seneca);
 
-        seneca.log.debug(operation_name, ent, desc)
+        console.log("finalizeSave", fent);
+        seneca.log.debug(operation_name, ent, desc);
 
-        return done(null, fent)
+        return done(null, fent);
       }
     },
 
     load: function (args, cb) {
-      const qent = args.qent
-      const q = args.q
+      const qent = args.qent;
+      const q = args.q;
 
       return getcoll(args, qent, function (err, coll) {
         if (!error(args, err, cb)) {
-          const mq = intern.metaquery(q)
-          const qq = intern.fixquery(q, seneca, options)
+          const mq = intern.metaquery(q);
+          const qq = intern.fixquery(q, seneca, options);
 
           return coll.findOne(qq, mq, function (err, entp) {
             if (!error(args, err, cb)) {
-              let fent = null
+              let fent = null;
               if (entp) {
-                entp.id = intern.idstr(entp._id)
-                delete entp._id
-                fent = qent.make$(entp)
+                entp.id = intern.idstr(entp._id);
+                delete entp._id;
+                fent = qent.make$(entp);
               }
-              seneca.log.debug('load', q, fent, desc)
-              cb(null, fent)
+              seneca.log.debug("load", q, fent, desc);
+              cb(null, fent);
             }
-          })
+          });
         }
-      })
+      });
     },
 
     list: function (args, cb) {
-      const qent = args.qent
-      const q = args.q
+      const qent = args.qent;
+      const q = args.q;
 
       return getcoll(args, qent, function (err, coll) {
         if (!error(args, err, cb)) {
-          const mq = intern.metaquery(q)
-          const qq = intern.fixquery(q, seneca, options)
+          const mq = intern.metaquery(q);
+          const qq = intern.fixquery(q, seneca, options);
 
           return coll.find(qq, mq, function (err, cur) {
             if (!error(args, err, cb)) {
-              const list = []
+              const list = [];
 
               cur.each(function (err, entp) {
                 if (!error(args, err, cb)) {
                   if (entp) {
-                    let fent = null
-                    entp.id = intern.idstr(entp._id)
-                    delete entp._id
-                    fent = qent.make$(entp)
-                    list.push(fent)
+                    let fent = null;
+                    entp.id = intern.idstr(entp._id);
+                    delete entp._id;
+                    fent = qent.make$(entp);
+                    list.push(fent);
                   } else {
-                    seneca.log.debug('list', q, list.length, list[0], desc)
-                    cb(null, list)
+                    seneca.log.debug("list", q, list.length, list[0], desc);
+                    cb(null, list);
                   }
                 }
-              })
+              });
             }
-          })
+          });
         }
-      })
+      });
     },
 
     remove: function (args, cb) {
-      const qent = args.qent
-      const q = args.q
+      const qent = args.qent;
+      const q = args.q;
 
-      const all = q.all$ // default false
-      const load = null == q.load$ ? false : q.load$ // default false
+      const all = q.all$; // default false
+      const load = null == q.load$ ? false : q.load$; // default false
 
       getcoll(args, qent, function (err, coll) {
         if (!error(args, err, cb)) {
-          const mq = intern.metaquery(q)
-          const qq = intern.fixquery(q, seneca, options)
+          const mq = intern.metaquery(q);
+          const qq = intern.fixquery(q, seneca, options);
 
           if (all) {
             return coll.find(qq, mq, function (err, cur) {
               if (!error(args, err, cb)) {
-                const list = []
-                const toDelete = []
+                const list = [];
+                const toDelete = [];
 
                 cur.each(function (err, entp) {
                   if (!error(args, err, cb)) {
                     if (entp) {
-                      let fent = null
+                      let fent = null;
                       if (entp) {
-                        toDelete.push(entp._id)
-                        entp.id = intern.idstr(entp._id)
-                        delete entp._id
-                        fent = qent.make$(entp)
+                        toDelete.push(entp._id);
+                        entp.id = intern.idstr(entp._id);
+                        delete entp._id;
+                        fent = qent.make$(entp);
                       }
-                      list.push(fent)
+                      list.push(fent);
                     } else {
                       coll.deleteMany(
                         { _id: { $in: toDelete } },
                         function (err) {
-                          seneca.log.debug('remove/all', q, desc)
-                          cb(err, null)
+                          seneca.log.debug("remove/all", q, desc);
+                          cb(err, null);
                         }
-                      )
+                      );
                     }
                   }
-                })
+                });
               }
-            })
+            });
           } else {
             return coll.findOne(qq, mq, function (err, entp) {
               if (!error(args, err, cb)) {
                 if (entp) {
                   return coll.deleteOne({ _id: entp._id }, {}, function (err) {
-                    seneca.log.debug('remove/one', q, entp, desc)
-                    const ent = load ? entp : null
-                    cb(err, ent)
-                  })
-                } else cb(null)
+                    seneca.log.debug("remove/one", q, entp, desc);
+                    const ent = load ? entp : null;
+                    cb(err, ent);
+                  });
+                } else cb(null);
               }
-            })
+            });
           }
         }
-      })
+      });
     },
 
     native: function (args, done) {
-      dbinst.collection('seneca', function (err, coll) {
+      dbinst.collection("seneca", function (err, coll) {
         if (!error(args, err, done)) {
           coll.findOne({}, {}, function (err) {
             if (!error(args, err, done)) {
-              done(null, dbinst)
+              done(null, dbinst);
             } else {
-              done(err)
+              done(err);
             }
-          })
+          });
         } else {
-          done(err)
+          done(err);
         }
-      })
+      });
     },
-  }
+  };
 
-  let init = seneca.export("entity/init")
-  const meta = init(seneca, options, store)
+  let init = seneca.export("entity/init");
+  const meta = init(seneca, options, store);
   // const meta = seneca.store.init(seneca, options, store)
-  desc = meta.desc
+  desc = meta.desc;
 
   seneca.add({ init: store.name, tag: meta.tag }, function (args, done) {
     configure(options, function (err) {
       if (err) {
-        return seneca.die('store', err, { store: store.name, desc: desc })
+        return seneca.die("store", err, { store: store.name, desc: desc });
       }
 
-      return done()
-    })
-  })
+      return done();
+    });
+  });
 
   return {
     name: store.name,
@@ -386,9 +422,9 @@ const mongo_store = function mongo_store(options) {
     export: {
       mongo: () => dbinst,
     },
-  }
-}
+  };
+};
 
-mongo_store.intern = intern
+mongo_store.intern = intern;
 
-module.exports = mongo_store
+module.exports = mongo_store;

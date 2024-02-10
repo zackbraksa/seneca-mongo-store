@@ -58,7 +58,8 @@
     "prettier": "3.2.5",
     "seneca": "3.34.1",
     "seneca-entity": "25.1.3",
-    "seneca-store-test": "5.2.0"
+    "seneca-store-test": "5.2.0",
+    "seneca-promisify": ">=3"
   },
   "files": [
     "lib/**/*.js",

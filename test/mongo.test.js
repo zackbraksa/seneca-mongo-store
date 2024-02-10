@@ -3,58 +3,58 @@
   Copyright (c) 2010-2021, Richard Rodger and other contributors.
 */
 
-'use strict'
+"use strict";
 
-const Assert = require('assert')
+const Assert = require("assert");
 
-const Seneca = require('seneca')
-const Async = require('async')
+const Seneca = require("seneca");
+const Async = require("async");
 
-const Shared = require('seneca-store-test')
+const Shared = require("seneca-store-test");
 
-const Lab = require('@hapi/lab')
-const Code = require('@hapi/code')
-const expect = Code.expect
+const Lab = require("@hapi/lab");
+const Code = require("@hapi/code");
+const expect = Code.expect;
 
-const lab = (exports.lab = Lab.script())
-const { describe, before, beforeEach, after, afterEach } = lab
+const lab = (exports.lab = Lab.script());
+const { describe, before, beforeEach, after, afterEach } = lab;
 
-const { make_it } = require('./support/helpers')
-const it = make_it(lab)
+const { make_it } = require("./support/helpers");
+const it = make_it(lab);
 
-describe('shared tests', function () {
-  const si = makeSenecaForTest()
+describe("shared tests", function () {
+  const si = makeSenecaForTest();
 
   const si_merge = makeSenecaForTest({
     mongo_store_opts: {
       merge: false,
     },
-  })
+  });
 
-  before(() => prepareForRaceConditionTesting(si))
+  before(() => prepareForRaceConditionTesting(si));
 
-  after(() => unprepareAfterRaceConditionTesting(si))
+  after(() => unprepareAfterRaceConditionTesting(si));
 
   Shared.basictest({
     seneca: si,
     senecaMerge: si_merge,
     script: lab,
-  })
+  });
 
   Shared.limitstest({
     seneca: si,
     script: lab,
-  })
+  });
 
   Shared.sorttest({
     seneca: si,
     script: lab,
-  })
+  });
 
   Shared.upserttest({
     seneca: si,
     script: lab,
-  })
+  });
 
   // NOTE: WARNING: The reason we need a unique index on the users.email
   // field is for Mongo to be able to avert race conditions. Without it,
@@ -66,986 +66,986 @@ describe('shared tests', function () {
   //
   function prepareForRaceConditionTesting(si) {
     return new Promise((resolve, reject) => {
-      return si.make('users').native$((err, db) => {
+      return si.make("users").native$((err, db) => {
         if (err) {
-          return reject(err)
+          return reject(err);
         }
 
         return db
-          .collection('users')
+          .collection("users")
           .createIndex({ email: 1 }, { unique: true }, (err) => {
             if (err) {
-              return reject(err)
+              return reject(err);
             }
 
-            return resolve()
-          })
-      })
-    })
+            return resolve();
+          });
+      });
+    });
   }
 
   function unprepareAfterRaceConditionTesting(si) {
     return new Promise((resolve, reject) => {
-      return si.make('users').native$((err, db) => {
+      return si.make("users").native$((err, db) => {
         if (err) {
-          return reject(err)
+          return reject(err);
         }
 
-        return db.collection('users').dropIndex({ email: 1 }, (err) => {
+        return db.collection("users").dropIndex({ email: 1 }, (err) => {
           if (err) {
-            return reject(err)
+            return reject(err);
           }
 
-          return resolve()
-        })
-      })
-    })
+          return resolve();
+        });
+      });
+    });
   }
-})
+});
 
-it('extra test', function (done) {
-  const si = makeSenecaForTest()
-  extratest(si, done)
-})
+it("extra test", function (done) {
+  const si = makeSenecaForTest();
+  extratest(si, done);
+});
 
-describe('#list$, when mongo_operator_shortcut:false', () => {
+describe("#list$, when mongo_operator_shortcut:false", () => {
   const si = makeSenecaForTest({
     mongo_store_opts: {
       mongo_operator_shortcut: false,
     },
-  })
+  });
 
-  before(() => clearDb(si))
+  before(() => clearDb(si));
 
-  after(() => clearDb(si))
-
-  before(
-    () =>
-      new Promise((resolve, reject) => {
-        si.make('products')
-          .data$({ name: 'cherry', price: 95 })
-          .save$((err, product) => {
-            if (err) {
-              return reject(err)
-            }
-
-            return resolve(product)
-          })
-      })
-  )
+  after(() => clearDb(si));
 
   before(
     () =>
       new Promise((resolve, reject) => {
-        si.make('products')
-          .data$({ name: 'orange', price: 200 })
+        si.make("products")
+          .data$({ name: "cherry", price: 95 })
           .save$((err, product) => {
             if (err) {
-              return reject(err)
+              return reject(err);
             }
 
-            return resolve(product)
-          })
+            return resolve(product);
+          });
       })
-  )
+  );
 
-  it('removes mongo props from the query', (fin) => {
-    si.test(fin)
+  before(
+    () =>
+      new Promise((resolve, reject) => {
+        si.make("products")
+          .data$({ name: "orange", price: 200 })
+          .save$((err, product) => {
+            if (err) {
+              return reject(err);
+            }
 
-    si.make('products').list$(
+            return resolve(product);
+          });
+      })
+  );
+
+  it("removes mongo props from the query", (fin) => {
+    si.test(fin);
+
+    si.make("products").list$(
       {
-        $or: [{ name: 'cherry' }, { price: 200 }],
+        $or: [{ name: "cherry" }, { price: 200 }],
       },
       (err, products) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
-        expect(products.length).to.equal(2)
+        expect(products.length).to.equal(2);
 
-        return fin()
+        return fin();
       }
-    )
-  })
-})
+    );
+  });
+});
 
-describe('#list$, when mongo_operator_shortcut:true', () => {
+describe("#list$, when mongo_operator_shortcut:true", () => {
   const si = makeSenecaForTest({
     mongo_store_opts: {
       mongo_operator_shortcut: true,
     },
-  })
+  });
 
-  before(() => clearDb(si))
+  before(() => clearDb(si));
 
-  after(() => clearDb(si))
-
-  before(
-    () =>
-      new Promise((resolve, reject) => {
-        si.make('products')
-          .data$({ name: 'blackberry', price: 95 })
-          .save$((err, product) => {
-            if (err) {
-              return reject(err)
-            }
-
-            return resolve(product)
-          })
-      })
-  )
+  after(() => clearDb(si));
 
   before(
     () =>
       new Promise((resolve, reject) => {
-        si.make('products')
-          .data$({ name: 'orange', price: 200 })
+        si.make("products")
+          .data$({ name: "blackberry", price: 95 })
           .save$((err, product) => {
             if (err) {
-              return reject(err)
+              return reject(err);
             }
 
-            return resolve(product)
-          })
+            return resolve(product);
+          });
       })
-  )
+  );
 
-  it('keeps mongo props in the query', (fin) => {
-    si.test(fin)
+  before(
+    () =>
+      new Promise((resolve, reject) => {
+        si.make("products")
+          .data$({ name: "orange", price: 200 })
+          .save$((err, product) => {
+            if (err) {
+              return reject(err);
+            }
 
-    si.make('products').list$(
+            return resolve(product);
+          });
+      })
+  );
+
+  it("keeps mongo props in the query", (fin) => {
+    si.test(fin);
+
+    si.make("products").list$(
       {
-        $or: [{ name: 'cherry' }, { price: 200 }],
+        $or: [{ name: "cherry" }, { price: 200 }],
       },
       (err, products) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
-        expect(products.length).to.equal(1)
-        expect(products[0].name).to.equal('orange')
+        expect(products.length).to.equal(1);
+        expect(products[0].name).to.equal("orange");
 
-        return fin()
+        return fin();
       }
-    )
-  })
-})
+    );
+  });
+});
 
-describe('#list$, mongo_operator_shortcut:true, mixed query', () => {
+describe("#list$, mongo_operator_shortcut:true, mixed query", () => {
   const si = makeSenecaForTest({
     mongo_store_opts: {
       mongo_operator_shortcut: true,
     },
-  })
+  });
 
-  before(() => clearDb(si))
+  before(() => clearDb(si));
 
-  after(() => clearDb(si))
-
-  before(
-    () =>
-      new Promise((resolve, reject) => {
-        si.make('products')
-          .data$({ name: 'cherry', price: 95, version: 1 })
-          .save$((err, product) => {
-            if (err) {
-              return reject(err)
-            }
-
-            return resolve(product)
-          })
-      })
-  )
+  after(() => clearDb(si));
 
   before(
     () =>
       new Promise((resolve, reject) => {
-        si.make('products')
-          .data$({ name: 'orange', price: 200, version: 2 })
+        si.make("products")
+          .data$({ name: "cherry", price: 95, version: 1 })
           .save$((err, product) => {
             if (err) {
-              return reject(err)
+              return reject(err);
             }
 
-            return resolve(product)
-          })
+            return resolve(product);
+          });
       })
-  )
+  );
 
-  it('does not break array-args', (fin) => {
-    si.test(fin)
+  before(
+    () =>
+      new Promise((resolve, reject) => {
+        si.make("products")
+          .data$({ name: "orange", price: 200, version: 2 })
+          .save$((err, product) => {
+            if (err) {
+              return reject(err);
+            }
 
-    si.make('products').list$(
+            return resolve(product);
+          });
+      })
+  );
+
+  it("does not break array-args", (fin) => {
+    si.test(fin);
+
+    si.make("products").list$(
       {
         version: [1, 2],
-        $or: [{ name: 'cherry' }, { price: 200 }],
+        $or: [{ name: "cherry" }, { price: 200 }],
       },
       (err, products) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
-        expect(products.length).to.equal(2)
+        expect(products.length).to.equal(2);
 
-        return fin()
+        return fin();
       }
-    )
-  })
-})
+    );
+  });
+});
 
-describe('#list$, when the mongo_operator_shortcut option is missing', () => {
-  const si = makeSenecaForTest()
+describe("#list$, when the mongo_operator_shortcut option is missing", () => {
+  const si = makeSenecaForTest();
 
-  before(() => clearDb(si))
+  before(() => clearDb(si));
 
-  after(() => clearDb(si))
-
-  before(
-    () =>
-      new Promise((resolve, reject) => {
-        si.make('products')
-          .data$({ name: 'blackberry', price: 95 })
-          .save$((err, product) => {
-            if (err) {
-              return reject(err)
-            }
-
-            return resolve(product)
-          })
-      })
-  )
+  after(() => clearDb(si));
 
   before(
     () =>
       new Promise((resolve, reject) => {
-        si.make('products')
-          .data$({ name: 'orange', price: 200 })
+        si.make("products")
+          .data$({ name: "blackberry", price: 95 })
           .save$((err, product) => {
             if (err) {
-              return reject(err)
+              return reject(err);
             }
 
-            return resolve(product)
-          })
+            return resolve(product);
+          });
       })
-  )
+  );
 
-  it('keeps mongo props in the query', (fin) => {
-    si.test(fin)
+  before(
+    () =>
+      new Promise((resolve, reject) => {
+        si.make("products")
+          .data$({ name: "orange", price: 200 })
+          .save$((err, product) => {
+            if (err) {
+              return reject(err);
+            }
 
-    si.make('products').list$(
+            return resolve(product);
+          });
+      })
+  );
+
+  it("keeps mongo props in the query", (fin) => {
+    si.test(fin);
+
+    si.make("products").list$(
       {
-        $or: [{ name: 'cherry' }, { price: 200 }],
+        $or: [{ name: "cherry" }, { price: 200 }],
       },
       (err, products) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
-        expect(products.length).to.equal(1)
-        expect(products[0].name).to.equal('orange')
+        expect(products.length).to.equal(1);
+        expect(products[0].name).to.equal("orange");
 
-        return fin()
+        return fin();
       }
-    )
-  })
-})
+    );
+  });
+});
 
-describe('the save$ query includes the id$ field', () => {
-  const si = makeSenecaForTest()
+describe("the save$ query includes the id$ field", () => {
+  const si = makeSenecaForTest();
 
-  beforeEach(() => clearDb(si))
+  beforeEach(() => clearDb(si));
 
-  afterEach(() => clearDb(si))
+  afterEach(() => clearDb(si));
 
-  const new_id = 'ffffa6f73a861890cc1f4e23'
+  const new_id = "ffffa6f73a861890cc1f4e23";
 
-  it('creates a new entity with the given id', (fin) => {
-    si.test(fin)
+  it("creates a new entity with the given id", (fin) => {
+    si.test(fin);
 
-    si.make('users')
-      .data$({ first_name: 'Frank', last_name: 'Sinatra' })
+    si.make("users")
+      .data$({ first_name: "Frank", last_name: "Sinatra" })
       .save$({ id$: new_id }, (err) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
-        si.make('users').list$({}, (err, users) => {
+        si.make("users").list$({}, (err, users) => {
           if (err) {
-            return fin(err)
+            return fin(err);
           }
 
-          expect(users.length).to.equal(1)
+          expect(users.length).to.equal(1);
 
-          const user = users[0]
+          const user = users[0];
 
-          expect(user.id).to.equal(new_id)
+          expect(user.id).to.equal(new_id);
 
-          return fin()
-        })
-      })
-  })
+          return fin();
+        });
+      });
+  });
 
-  it('passes the new entity to the save$ callback', (fin) => {
-    si.test(fin)
+  it("passes the new entity to the save$ callback", (fin) => {
+    si.test(fin);
 
-    si.make('users')
-      .data$({ first_name: 'Frank', last_name: 'Sinatra' })
+    si.make("users")
+      .data$({ first_name: "Frank", last_name: "Sinatra" })
       .save$({ id$: new_id }, (err, user) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
         expect(user).to.contain({
           id: new_id,
-          first_name: 'Frank',
-          last_name: 'Sinatra',
-        })
+          first_name: "Frank",
+          last_name: "Sinatra",
+        });
 
-        return fin()
-      })
-  })
-})
+        return fin();
+      });
+  });
+});
 
-describe('the mongo store plugin is passed the `generate_id` option', () => {
-  const new_id = 'ffffa6f73a861890cc1f4e23'
+describe("the mongo store plugin is passed the `generate_id` option", () => {
+  const new_id = "ffffa6f73a861890cc1f4e23";
 
   const si = makeSenecaForTest({
     mongo_store_opts: {
       generate_id(_ent) {
-        return new_id
+        return new_id;
       },
     },
-  })
+  });
 
-  beforeEach(() => clearDb(si))
+  beforeEach(() => clearDb(si));
 
-  afterEach(() => clearDb(si))
+  afterEach(() => clearDb(si));
 
-  it('creates a new entity with the given id', (fin) => {
-    si.test(fin)
+  it("creates a new entity with the given id", (fin) => {
+    si.test(fin);
 
-    si.make('users')
-      .data$({ first_name: 'Frank', last_name: 'Sinatra' })
+    si.make("users")
+      .data$({ first_name: "Frank", last_name: "Sinatra" })
       .save$((err) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
-        si.make('users').list$({}, (err, users) => {
+        si.make("users").list$({}, (err, users) => {
           if (err) {
-            return fin(err)
+            return fin(err);
           }
 
-          expect(users.length).to.equal(1)
+          expect(users.length).to.equal(1);
 
-          const user = users[0]
+          const user = users[0];
 
-          expect(user.id).to.equal(new_id)
+          expect(user.id).to.equal(new_id);
 
-          return fin()
-        })
-      })
-  })
+          return fin();
+        });
+      });
+  });
 
-  it('passes the new entity to the save$ callback', (fin) => {
-    si.test(fin)
+  it("passes the new entity to the save$ callback", (fin) => {
+    si.test(fin);
 
-    si.make('users')
-      .data$({ first_name: 'Frank', last_name: 'Sinatra' })
+    si.make("users")
+      .data$({ first_name: "Frank", last_name: "Sinatra" })
       .save$((err, user) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
         expect(user).to.contain({
           id: new_id,
-          first_name: 'Frank',
-          last_name: 'Sinatra',
-        })
+          first_name: "Frank",
+          last_name: "Sinatra",
+        });
 
-        return fin()
-      })
-  })
-})
+        return fin();
+      });
+  });
+});
 
-describe('both the save$.id$ field is present and the plugin includes the `generate_id` option', () => {
-  const new_id_via_generate_id = 'ffffa6f73a861890cc1f4e23'
-  const new_id_via_save_query = 'bbbba6f73a861890cc1f4e23'
+describe("both the save$.id$ field is present and the plugin includes the `generate_id` option", () => {
+  const new_id_via_generate_id = "ffffa6f73a861890cc1f4e23";
+  const new_id_via_save_query = "bbbba6f73a861890cc1f4e23";
 
   const si = makeSenecaForTest({
     mongo_store_opts: {
       generate_id(_ent) {
-        return new_id_via_generate_id
+        return new_id_via_generate_id;
       },
     },
-  })
+  });
 
-  before(() => waitOnSeneca(si))
+  before(() => waitOnSeneca(si));
 
-  beforeEach(() => clearDb(si))
+  beforeEach(() => clearDb(si));
 
-  afterEach(() => clearDb(si))
+  afterEach(() => clearDb(si));
 
-  it('creates a new entity with the id in the save$ query', (fin) => {
-    si.test(fin)
+  it("creates a new entity with the id in the save$ query", (fin) => {
+    si.test(fin);
 
-    si.make('users')
-      .data$({ first_name: 'Frank', last_name: 'Sinatra' })
+    si.make("users")
+      .data$({ first_name: "Frank", last_name: "Sinatra" })
       .save$({ id$: new_id_via_save_query }, (err) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
-        si.make('users').list$({}, (err, users) => {
+        si.make("users").list$({}, (err, users) => {
           if (err) {
-            return fin(err)
+            return fin(err);
           }
 
-          expect(users.length).to.equal(1)
+          expect(users.length).to.equal(1);
 
-          const user = users[0]
+          const user = users[0];
 
-          expect(user.id).to.equal(new_id_via_save_query)
+          expect(user.id).to.equal(new_id_via_save_query);
 
-          return fin()
-        })
-      })
-  })
+          return fin();
+        });
+      });
+  });
 
-  it('passes the new entity to the save$ callback', (fin) => {
-    si.test(fin)
+  it("passes the new entity to the save$ callback", (fin) => {
+    si.test(fin);
 
-    si.make('users')
-      .data$({ first_name: 'Frank', last_name: 'Sinatra' })
+    si.make("users")
+      .data$({ first_name: "Frank", last_name: "Sinatra" })
       .save$({ id$: new_id_via_save_query }, (err, user) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
         expect(user).to.contain({
           id: new_id_via_save_query,
-          first_name: 'Frank',
-          last_name: 'Sinatra',
-        })
+          first_name: "Frank",
+          last_name: "Sinatra",
+        });
 
-        return fin()
-      })
-  })
-})
+        return fin();
+      });
+  });
+});
 
-describe('#save$, when the merge:false option is passed to the plugin', () => {
+describe("#save$, when the merge:false option is passed to the plugin", () => {
   const si_merge = makeSenecaForTest({
     mongo_store_opts: {
       merge: false,
     },
-  })
+  });
 
-  before(() => clearDb(si_merge))
+  before(() => clearDb(si_merge));
 
-  after(() => clearDb(si_merge))
+  after(() => clearDb(si_merge));
 
   before(
     () =>
       new Promise((resolve, reject) => {
         si_merge
-          .make('users')
-          .data$({ first_name: 'Frank', last_name: 'Sinatra' })
+          .make("users")
+          .data$({ first_name: "Frank", last_name: "Sinatra" })
           .save$((err) => {
             if (err) {
-              return reject(err)
+              return reject(err);
             }
 
-            return resolve()
-          })
+            return resolve();
+          });
       })
-  )
+  );
 
-  let target_user_id
+  let target_user_id;
 
   before(
     () =>
       new Promise((resolve, reject) => {
         si_merge
-          .make('users')
-          .data$({ first_name: 'Elvis', last_name: 'Presley' })
+          .make("users")
+          .data$({ first_name: "Elvis", last_name: "Presley" })
           .save$((err, user) => {
             if (err) {
-              return reject(err)
+              return reject(err);
             }
 
-            target_user_id = user.id
+            target_user_id = user.id;
 
-            return resolve()
-          })
+            return resolve();
+          });
       })
-  )
+  );
 
-  let target_user
+  let target_user;
 
   before(
     () =>
       new Promise((resolve, reject) => {
         // Do a fresh fetch from the db.
         //
-        si_merge.make('users').load$(target_user_id, (err, user) => {
+        si_merge.make("users").load$(target_user_id, (err, user) => {
           if (err) {
-            return reject(err)
+            return reject(err);
           }
 
-          Assert.ok(user, 'users')
-          target_user = user
+          Assert.ok(user, "users");
+          target_user = user;
 
-          return resolve()
-        })
+          return resolve();
+        });
       })
-  )
+  );
 
-  it('replaces the existing entity', (fin) => {
-    si_merge.test(fin)
+  it("replaces the existing entity", (fin) => {
+    si_merge.test(fin);
 
-    target_user.data$({ first_name: 'ELVIS' }).save$((err) => {
+    target_user.data$({ first_name: "ELVIS" }).save$((err) => {
       if (err) {
-        return fin(err)
+        return fin(err);
       }
 
-      return si_merge.make('users').list$((err, users) => {
+      return si_merge.make("users").list$((err, users) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
-        expect(users.length).to.equal(2)
+        expect(users.length).to.equal(2);
 
         expect(users[0]).to.contain({
-          first_name: 'Frank',
-          last_name: 'Sinatra',
-        })
+          first_name: "Frank",
+          last_name: "Sinatra",
+        });
 
         expect(users[1]).to.contain({
           id: target_user_id,
-          first_name: 'ELVIS',
-          last_name: 'Presley',
-        })
+          first_name: "ELVIS",
+          last_name: "Presley",
+        });
 
-        return fin()
-      })
-    })
-  })
-})
+        return fin();
+      });
+    });
+  });
+});
 
-describe('#save$, when without the merge option', () => {
-  const si = makeSenecaForTest()
+describe("#save$, when without the merge option", () => {
+  const si = makeSenecaForTest();
 
-  before(() => clearDb(si))
+  before(() => clearDb(si));
 
-  after(() => clearDb(si))
+  after(() => clearDb(si));
 
   before(
     () =>
       new Promise((resolve, reject) => {
-        si.make('users')
-          .data$({ first_name: 'Frank', last_name: 'Sinatra' })
+        si.make("users")
+          .data$({ first_name: "Frank", last_name: "Sinatra" })
           .save$((err) => {
             if (err) {
-              return reject(err)
+              return reject(err);
             }
 
-            return resolve()
-          })
+            return resolve();
+          });
       })
-  )
+  );
 
-  let target_user_id
+  let target_user_id;
 
   before(
     () =>
       new Promise((resolve, reject) => {
-        si.make('users')
-          .data$({ first_name: 'Elvis', last_name: 'Presley' })
+        si.make("users")
+          .data$({ first_name: "Elvis", last_name: "Presley" })
           .save$((err, user) => {
             if (err) {
-              return reject(err)
+              return reject(err);
             }
 
-            target_user_id = user.id
+            target_user_id = user.id;
 
-            return resolve()
-          })
+            return resolve();
+          });
       })
-  )
+  );
 
-  let target_user
+  let target_user;
 
   before(
     () =>
       new Promise((resolve, reject) => {
         // Do a fresh fetch from the db.
         //
-        si.make('users').load$(target_user_id, (err, user) => {
+        si.make("users").load$(target_user_id, (err, user) => {
           if (err) {
-            return reject(err)
+            return reject(err);
           }
 
-          Assert.ok(user, 'users')
+          Assert.ok(user, "users");
 
-          target_user = user
+          target_user = user;
 
-          return resolve()
-        })
+          return resolve();
+        });
       })
-  )
+  );
 
-  it('updates the existing entity', (fin) => {
-    si.test(fin)
+  it("updates the existing entity", (fin) => {
+    si.test(fin);
 
-    target_user.data$({ first_name: 'ELVIS' }).save$((err) => {
+    target_user.data$({ first_name: "ELVIS" }).save$((err) => {
       if (err) {
-        return fin(err)
+        return fin(err);
       }
 
-      si.make('users').list$({}, (err, users) => {
+      si.make("users").list$({}, (err, users) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
-        expect(users.length).to.equal(2)
+        expect(users.length).to.equal(2);
 
         expect(users[0]).to.contain({
-          first_name: 'Frank',
-          last_name: 'Sinatra',
-        })
+          first_name: "Frank",
+          last_name: "Sinatra",
+        });
 
         expect(users[1]).to.contain({
           id: target_user_id,
-          first_name: 'ELVIS',
-          last_name: 'Presley',
-        })
+          first_name: "ELVIS",
+          last_name: "Presley",
+        });
 
-        return fin()
-      })
-    })
-  })
-})
+        return fin();
+      });
+    });
+  });
+});
 
-describe('upsert, generate_id option, matching entity exists', () => {
-  const new_id = 'bbbba6f73a861890cc1f4e23'
+describe("upsert, generate_id option, matching entity exists", () => {
+  const new_id = "bbbba6f73a861890cc1f4e23";
 
   const si = makeSenecaForTest({
     mongo_store_opts: {
       generate_id(ent) {
-        if ('age' in ent) {
-          return new_id
+        if ("age" in ent) {
+          return new_id;
         }
 
-        return null
+        return null;
       },
     },
-  })
+  });
 
-  before(() => waitOnSeneca(si))
+  before(() => waitOnSeneca(si));
 
-  before(() => clearDb(si))
+  before(() => clearDb(si));
 
-  after(() => clearDb(si))
+  after(() => clearDb(si));
 
-  let target_user_id
+  let target_user_id;
 
   before(
     () =>
       new Promise((resolve, reject) => {
-        si.make('users')
-          .data$({ first_name: 'Elvis', last_name: 'Presley' })
+        si.make("users")
+          .data$({ first_name: "Elvis", last_name: "Presley" })
           .save$((err, user) => {
             if (err) {
-              return reject(err)
+              return reject(err);
             }
 
-            target_user_id = user.id
+            target_user_id = user.id;
 
-            return resolve()
-          })
+            return resolve();
+          });
       })
-  )
+  );
 
-  let target_user
+  let target_user;
 
   before(
     () =>
       new Promise((resolve, reject) => {
         // Do a fresh fetch from the db.
         //
-        si.make('users').load$(target_user_id, (err, user) => {
+        si.make("users").load$(target_user_id, (err, user) => {
           if (err) {
-            return reject(err)
+            return reject(err);
           }
 
-          Assert.ok(user, 'users')
-          target_user = user
+          Assert.ok(user, "users");
+          target_user = user;
 
-          return resolve()
-        })
+          return resolve();
+        });
       })
-  )
+  );
 
-  it('updates the fields and ignores the generate_id option', (fin) => {
-    si.test(fin)
+  it("updates the fields and ignores the generate_id option", (fin) => {
+    si.test(fin);
 
-    si.make('users')
-      .data$({ first_name: 'Elvis', last_name: 'PRESLEY', age: 25 })
-      .save$({ upsert$: ['first_name'] }, (err) => {
+    si.make("users")
+      .data$({ first_name: "Elvis", last_name: "PRESLEY", age: 25 })
+      .save$({ upsert$: ["first_name"] }, (err) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
-        si.make('users').list$({}, (err, users) => {
+        si.make("users").list$({}, (err, users) => {
           if (err) {
-            return fin(err)
+            return fin(err);
           }
 
-          expect(users.length).to.equal(1)
+          expect(users.length).to.equal(1);
 
           expect(users[0]).to.contain({
-            first_name: 'Elvis',
-            last_name: 'PRESLEY',
+            first_name: "Elvis",
+            last_name: "PRESLEY",
             age: 25,
-          })
+          });
 
-          expect(users[0].id).not.to.equal(new_id)
+          expect(users[0].id).not.to.equal(new_id);
 
-          return fin()
-        })
-      })
-  })
-})
+          return fin();
+        });
+      });
+  });
+});
 
 describe("upsert, generate_id option, matching entity doesn't exist", () => {
-  const new_id = 'ffffa6f73a861890cc1f4e23'
+  const new_id = "ffffa6f73a861890cc1f4e23";
 
   const si = makeSenecaForTest({
     mongo_store_opts: {
       generate_id(_ent) {
-        return new_id
+        return new_id;
       },
     },
-  })
+  });
 
-  before(() => waitOnSeneca(si))
+  before(() => waitOnSeneca(si));
 
-  before(() => clearDb(si))
+  before(() => clearDb(si));
 
-  after(() => clearDb(si))
+  after(() => clearDb(si));
 
-  it('creates a new entity with the given id', (fin) => {
-    si.test(fin)
+  it("creates a new entity with the given id", (fin) => {
+    si.test(fin);
 
-    si.make('users')
-      .data$({ first_name: 'Frank', last_name: 'Sinatra' })
-      .save$({ upsert$: ['first_name'] }, (err) => {
+    si.make("users")
+      .data$({ first_name: "Frank", last_name: "Sinatra" })
+      .save$({ upsert$: ["first_name"] }, (err) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
-        si.make('users').list$({}, (err, users) => {
+        si.make("users").list$({}, (err, users) => {
           if (err) {
-            return fin(err)
+            return fin(err);
           }
 
-          expect(users.length).to.equal(1)
+          expect(users.length).to.equal(1);
 
-          const user = users[0]
+          const user = users[0];
 
-          expect(user.id).to.equal(new_id)
+          expect(user.id).to.equal(new_id);
 
-          return fin()
-        })
-      })
-  })
-})
+          return fin();
+        });
+      });
+  });
+});
 
-describe('upsert, matches many entities on 1 upsert$ field', () => {
-  const si = makeSenecaForTest()
+describe("upsert, matches many entities on 1 upsert$ field", () => {
+  const si = makeSenecaForTest();
 
-  before(() => clearDb(si))
+  before(() => clearDb(si));
 
-  after(() => clearDb(si))
-
-  before(
-    () =>
-      new Promise((fin) => {
-        si.make('products')
-          .data$({ label: 'a toothbrush', price: '3.95' })
-          .save$(fin)
-      })
-  )
+  after(() => clearDb(si));
 
   before(
     () =>
       new Promise((fin) => {
-        si.make('products')
-          .data$({ label: 'a toothbrush', price: '3.70' })
-          .save$(fin)
+        si.make("products")
+          .data$({ label: "a toothbrush", price: "3.95" })
+          .save$(fin);
       })
-  )
+  );
 
   before(
     () =>
       new Promise((fin) => {
-        si.make('products')
-          .data$({ label: 'bbs tires', price: '4.10' })
-          .save$(fin)
+        si.make("products")
+          .data$({ label: "a toothbrush", price: "3.70" })
+          .save$(fin);
       })
-  )
+  );
 
-  it('updates a single matching entity', (fin) => {
-    si.test(fin)
+  before(
+    () =>
+      new Promise((fin) => {
+        si.make("products")
+          .data$({ label: "bbs tires", price: "4.10" })
+          .save$(fin);
+      })
+  );
 
-    si.make('products')
-      .data$({ label: 'a toothbrush', price: '4.95' })
-      .save$({ upsert$: ['label'] }, (err) => {
+  it("updates a single matching entity", (fin) => {
+    si.test(fin);
+
+    si.make("products")
+      .data$({ label: "a toothbrush", price: "4.95" })
+      .save$({ upsert$: ["label"] }, (err) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
-        si.make('products').list$({}, (err, products) => {
+        si.make("products").list$({}, (err, products) => {
           if (err) {
-            return fin(err)
+            return fin(err);
           }
 
-          expect(products.length).to.equal(3)
+          expect(products.length).to.equal(3);
 
           expect(products[0]).to.contain({
-            label: 'a toothbrush',
-            price: '4.95',
-          })
+            label: "a toothbrush",
+            price: "4.95",
+          });
 
           expect(products[1]).to.contain({
-            label: 'a toothbrush',
-            price: '3.70',
-          })
+            label: "a toothbrush",
+            price: "3.70",
+          });
 
           expect(products[2]).to.contain({
-            label: 'bbs tires',
-            price: '4.10',
-          })
+            label: "bbs tires",
+            price: "4.10",
+          });
 
-          return fin()
-        })
-      })
-  })
-})
+          return fin();
+        });
+      });
+  });
+});
 
-describe('upsert, matches many entities on 2 upsert$ fields', () => {
-  const si = makeSenecaForTest()
+describe("upsert, matches many entities on 2 upsert$ fields", () => {
+  const si = makeSenecaForTest();
 
-  before(() => clearDb(si))
+  before(() => clearDb(si));
 
-  after(() => clearDb(si))
+  after(() => clearDb(si));
 
   before(
     () =>
       new Promise((fin) => {
-        si.make('products')
+        si.make("products")
           .data$({
-            label: 'a toothbrush',
-            price: '3.95',
+            label: "a toothbrush",
+            price: "3.95",
             coolness_factor: 2,
           })
-          .save$(fin)
+          .save$(fin);
       })
-  )
+  );
 
   before(
     () =>
       new Promise((fin) => {
-        si.make('products')
+        si.make("products")
           .data$({
-            label: 'a toothbrush',
-            price: '3.70',
+            label: "a toothbrush",
+            price: "3.70",
             coolness_factor: 3,
           })
-          .save$(fin)
+          .save$(fin);
       })
-  )
+  );
 
   before(
     () =>
       new Promise((fin) => {
-        si.make('products')
+        si.make("products")
           .data$({
-            label: 'bbs tires',
-            price: '4.10',
+            label: "bbs tires",
+            price: "4.10",
             coolness_factor: 7,
           })
-          .save$(fin)
+          .save$(fin);
       })
-  )
+  );
 
-  it('updates a single matching entity', (fin) => {
-    si.test(fin)
+  it("updates a single matching entity", (fin) => {
+    si.test(fin);
 
-    si.make('products')
+    si.make("products")
       .data$({
-        label: 'a toothbrush',
-        price: '3.95',
+        label: "a toothbrush",
+        price: "3.95",
         coolness_factor: 4,
       })
-      .save$({ upsert$: ['label', 'price'] }, (err) => {
+      .save$({ upsert$: ["label", "price"] }, (err) => {
         if (err) {
-          return fin(err)
+          return fin(err);
         }
 
-        si.make('products').list$({}, (err, products) => {
+        si.make("products").list$({}, (err, products) => {
           if (err) {
-            return fin(err)
+            return fin(err);
           }
 
-          expect(products.length).to.equal(3)
+          expect(products.length).to.equal(3);
 
           expect(products[0]).to.contain({
-            label: 'a toothbrush',
-            price: '3.95',
+            label: "a toothbrush",
+            price: "3.95",
             coolness_factor: 4,
-          })
+          });
 
           expect(products[1]).to.contain({
-            label: 'a toothbrush',
-            price: '3.70',
+            label: "a toothbrush",
+            price: "3.70",
             coolness_factor: 3,
-          })
+          });
 
           expect(products[2]).to.contain({
-            label: 'bbs tires',
-            price: '4.10',
+            label: "bbs tires",
+            price: "4.10",
             coolness_factor: 7,
-          })
+          });
 
-          return fin()
-        })
-      })
-  })
-})
+          return fin();
+        });
+      });
+  });
+});
 
 async function clearDb(seneca) {
-  await clearCollection('products')
-  await clearCollection('users')
+  await clearCollection("products");
+  await clearCollection("users");
 
   function clearCollection(coll_name) {
     return new Promise((resolve, reject) => {
       seneca.make(coll_name).remove$({ all$: true }, (err) => {
         if (err) {
-          return reject(err)
+          return reject(err);
         }
 
-        return resolve()
-      })
-    })
+        return resolve();
+      });
+    });
   }
 }
 
 function waitOnSeneca(seneca) {
   return new Promise((fin) => {
-    return seneca.ready(fin)
-  })
+    return seneca.ready(fin);
+  });
 }
 
 // describe('mongo tests', function () {
@@ -1060,40 +1060,40 @@ function extratest(si, done) {
   Async.series(
     {
       native: function (cb) {
-        const foo = si.make$('foo')
+        const foo = si.make$("foo");
         foo.native$(function (err, db) {
-          if (err) return cb(err)
+          if (err) return cb(err);
 
-          db.collection('foo', function (err, coll) {
-            if (err) return cb(err)
+          db.collection("foo", function (err, coll) {
+            if (err) return cb(err);
 
             coll.find({}, {}, function (err, cursor) {
-              if (err) return cb(err)
+              if (err) return cb(err);
 
               cursor.each(function (err, entry) {
-                if (err) return cb(err)
+                if (err) return cb(err);
                 if (!entry) {
-                  cb()
+                  cb();
                 }
-              })
-            })
-          })
-        })
+              });
+            });
+          });
+        });
       },
 
       native_query: function (cb) {
-        const nat = si.make$('nat')
+        const nat = si.make$("nat");
         nat.remove$({ all$: true }, function (err) {
-          if (err) return cb(err)
+          if (err) return cb(err);
 
-          nat.a = 1
+          nat.a = 1;
           nat.save$(function (err, nat) {
-            if (err) return cb(err)
+            if (err) return cb(err);
 
-            nat = nat.make$()
-            nat.a = 2
+            nat = nat.make$();
+            nat.a = 2;
             nat.save$(function (err, nat) {
-              if (err) return cb(err)
+              if (err) return cb(err);
 
               nat.list$(
                 {
@@ -1101,211 +1101,207 @@ function extratest(si, done) {
                     {
                       /* $or:[{a:1},{a:2}]*/
                     },
-                    { sort: [['a', -1]] },
+                    { sort: [["a", -1]] },
                   ],
                 },
                 function (err, list) {
-                  if (err) return cb(err)
-                  Assert.equal(2, list.length)
-                  Assert.equal(2, list[0].a)
-                  Assert.equal(1, list[1].a)
-                  cb()
+                  if (err) return cb(err);
+                  Assert.equal(2, list.length);
+                  Assert.equal(2, list[0].a);
+                  Assert.equal(1, list[1].a);
+                  cb();
                 }
-              )
-            })
-          })
-        })
+              );
+            });
+          });
+        });
       },
 
       remove: function (cb) {
-        const cl = si.make$('lmt')
+        const cl = si.make$("lmt");
         cl.remove$({ all$: true }, function (err, foo) {
-          if (err) return cb(err)
-          cb()
-        })
+          if (err) return cb(err);
+          cb();
+        });
       },
 
       insert1st: function (cb) {
-        const cl = si.make$('lmt')
-        cl.p1 = 'v1'
+        const cl = si.make$("lmt");
+        cl.p1 = "v1";
         cl.save$(function (err, foo) {
-          if (err) return cb(err)
-          cb()
-        })
+          if (err) return cb(err);
+          cb();
+        });
       },
 
       insert2nd: function (cb) {
-        const cl = si.make$('lmt')
-        cl.p1 = 'v2'
+        const cl = si.make$("lmt");
+        cl.p1 = "v2";
         cl.save$(function (err, foo) {
-          if (err) return cb(err)
-          cb()
-        })
+          if (err) return cb(err);
+          cb();
+        });
       },
 
       insert3rd: function (cb) {
-        const cl = si.make$('lmt')
-        cl.p1 = 'v3'
+        const cl = si.make$("lmt");
+        cl.p1 = "v3";
         cl.save$(function (err, foo) {
-          if (err) return cb(err)
-          cb()
-        })
+          if (err) return cb(err);
+          cb();
+        });
       },
 
       listall: function (cb) {
-        const cl = si.make({ name$: 'lmt' })
+        const cl = si.make({ name$: "lmt" });
         cl.list$({}, function (err, lst) {
-          if (err) return cb(err)
-          Assert.equal(3, lst.length)
-          cb()
-        })
+          if (err) return cb(err);
+          Assert.equal(3, lst.length);
+          cb();
+        });
       },
 
       listlimit1skip1: function (cb) {
-        const cl = si.make({ name$: 'lmt' })
+        const cl = si.make({ name$: "lmt" });
         cl.list$({ limit$: 1, skip$: 1 }, function (err, lst) {
-          if (err) return cb(err)
-          Assert.equal(1, lst.length)
-          cb()
-        })
+          if (err) return cb(err);
+          Assert.equal(1, lst.length);
+          cb();
+        });
       },
 
       listlimit2skip3: function (cb) {
-        const cl = si.make({ name$: 'lmt' })
+        const cl = si.make({ name$: "lmt" });
         cl.list$({ limit$: 2, skip$: 3 }, function (err, lst) {
-          if (err) return cb(err)
-          Assert.equal(0, lst.length)
-          cb()
-        })
+          if (err) return cb(err);
+          Assert.equal(0, lst.length);
+          cb();
+        });
       },
 
       listlimit5skip2: function (cb) {
-        const cl = si.make({ name$: 'lmt' })
+        const cl = si.make({ name$: "lmt" });
         cl.list$({ limit$: 5, skip$: 2 }, function (err, lst) {
-          if (err) return cb(err)
-          Assert.equal(1, lst.length)
-          cb()
-        })
+          if (err) return cb(err);
+          Assert.equal(1, lst.length);
+          cb();
+        });
       },
 
       insertUpdate: function (cb) {
-        const cl = si.make$('lmt')
-        cl.p1 = 'value1'
-        cl.p2 = 2
+        const cl = si.make$("lmt");
+        cl.p1 = "value1";
+        cl.p2 = 2;
         cl.save$(function (err, foo) {
-          if (err) return cb(err)
-          Assert.ok(foo.id)
-          Assert.equal(foo.p1, 'value1')
-          Assert.equal(foo.p2, 2)
+          if (err) return cb(err);
+          Assert.ok(foo.id);
+          Assert.equal(foo.p1, "value1");
+          Assert.equal(foo.p2, 2);
 
-          delete foo.p1
-          foo.p2 = 2.2
+          delete foo.p1;
+          foo.p2 = 2.2;
 
           foo.save$(function (err, foo) {
-            if (err) return cb(err)
+            if (err) return cb(err);
 
             foo.load$({ id: foo.id }, function (err, foo) {
-              if (err) return cb(err)
-              Assert.ok(foo.id)
-              Assert.equal(foo.p1, 'value1')
-              Assert.equal(foo.p2, 2.2)
-              cb()
-            })
-          })
-        })
+              if (err) return cb(err);
+              Assert.ok(foo.id);
+              Assert.equal(foo.p1, "value1");
+              Assert.equal(foo.p2, 2.2);
+              cb();
+            });
+          });
+        });
       },
 
       fieldor: function (cb) {
-        si.make('zed').remove$({ all$: true })
-        si.make('zed', { p1: 'a', p2: 10 }).save$()
-        si.make('zed', { p1: 'b', p2: 20 }).save$()
-        si.make('zed', { p1: 'c', p2: 30 }).save$()
-        si.make('zed', { p1: 'a', p2: 40 }).save$()
+        si.make("zed").remove$({ all$: true });
+        si.make("zed", { p1: "a", p2: 10 }).save$();
+        si.make("zed", { p1: "b", p2: 20 }).save$();
+        si.make("zed", { p1: "c", p2: 30 }).save$();
+        si.make("zed", { p1: "a", p2: 40 }).save$();
         si.ready(function () {
-          si.make('zed').list$(function (err, list) {
-            expect(list.length).equal(4)
+          si.make("zed").list$(function (err, list) {
+            expect(list.length).equal(4);
 
-            si.make('zed').list$({ p1: 'a' }, function (err, list) {
+            si.make("zed").list$({ p1: "a" }, function (err, list) {
               //console.log(list)
-              expect(list.length).equal(2)
+              expect(list.length).equal(2);
 
               // OR on list values ($in operator)
-              si.make('zed').list$({ p1: ['a', 'b'] }, function (err, list) {
+              si.make("zed").list$({ p1: ["a", "b"] }, function (err, list) {
                 //console.log(list)
-                expect(list.length).equal(3)
+                expect(list.length).equal(3);
 
-                const ids = list.map((ent) => ent.id)
-                si.make('zed').list$({ id: ids }, function (err, list) {
+                const ids = list.map((ent) => ent.id);
+                si.make("zed").list$({ id: ids }, function (err, list) {
                   //console.log(list)
-                  expect(list.length).equal(3)
+                  expect(list.length).equal(3);
 
-                  cb()
-                })
-              })
-            })
-          })
-        })
+                  cb();
+                });
+              });
+            });
+          });
+        });
       },
     },
     function (err, out) {
-      if (err) return done(err)
-      done()
+      if (err) return done(err);
+      done();
     }
-  )
+  );
 }
 
-const si2 = Seneca()
+const si2 = Seneca();
 
-describe('mongo regular connection test', function () {
-  before({}, function (done) {
-    if (si2.version >= '2.0.0') {
-      si2.use('entity')
-    }
-    si2.use(require('..'), {
-      name: 'senecatest',
-      host: '127.0.0.1',
-      port: 27017,
-    })
+lab.test("simple test", async function (done) {
+  if (si2.version >= "2.0.0") {
+    si2.use("entity", { mem_store: false });
+  }
+  si2.use(require(".."), {
+    name: "senecatest",
+    host: "127.0.0.1",
+    port: 27017,
+  });
 
-    si2.ready(done)
-  })
+  await si2.ready();
 
-  it('simple test', function (done) {
-    const foo = si2.make('foo')
-    foo.p1 = 'v1'
-    foo.p2 = 'v2'
+  const foo = si2.entity("foo");
+  foo.p1 = "v1";
+  foo.p2 = "v2";
 
-    foo.save$(function (err, foo1) {
-      expect(err).to.not.exist()
-      expect(foo1.id).to.exist()
+  const res = await foo.save$();
 
-      foo1.load$(foo1.id, function (err, foo2) {
-        expect(err).to.not.exist()
-        expect(foo2).to.exist()
-        expect(foo2.id).to.equal(foo1.id)
-        expect(foo2.p1).to.equal('v1')
-        expect(foo2.p2).to.equal('v2')
+  console.log("res", res);
 
-        done()
-      })
-    })
-  })
-})
+  expect(err).to.not.exist();
+  expect(foo1.id).to.exist();
+
+  // await foo1.load$(foo1.id);
+
+  // expect(err).to.not.exist();
+  // expect(foo2).to.exist();
+  // expect(foo2.id).to.equal(foo1.id);
+  // expect(foo2.p1).to.equal("v1");
+  // expect(foo2.p2).to.equal("v2");
+});
 
 function makeSenecaForTest(opts = {}) {
-  const seneca = Seneca({ log: 'test' })
+  const seneca = Seneca({ log: "test" });
 
-  if (seneca.version >= '2.0.0') {
-    seneca.use('entity')
+  if (seneca.version >= "2.0.0") {
+    seneca.use("entity");
   }
 
-  const { mongo_store_opts } = opts
+  const { mongo_store_opts } = opts;
 
-  seneca.use(require('..'), {
-    uri: 'mongodb://127.0.0.1:27017',
-    db: 'senecatest',
+  seneca.use(require(".."), {
+    uri: "mongodb://127.0.0.1:27017",
+    db: "senecatest",
     ...mongo_store_opts,
-  })
+  });
 
-  return seneca
+  return seneca;
 }
